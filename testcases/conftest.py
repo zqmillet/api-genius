@@ -135,7 +135,7 @@ def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mys
         connection.execute(f'drop database if exists {mysql_database}')
 
 @fixture(name='used_models', scope='function')
-def _used_models(request: SubRequest, base_class):
+def _used_models(request: SubRequest, base_class: Type[Base]):
     models = []
     for fixture_name in request.fixturenames:
         try:
