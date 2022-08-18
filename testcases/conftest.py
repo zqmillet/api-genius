@@ -1,9 +1,6 @@
 import builtins
 from typing import Type
 from typing import TypeVar
-from socket import socket
-from socket import AF_INET
-from socket import SOCK_STREAM
 from urllib.parse import quote
 from multiprocessing import Process
 from time import sleep
@@ -11,6 +8,7 @@ from time import sleep
 from uvicorn import run
 from fastapi import FastAPI
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy import Column
 from sqlalchemy import String
@@ -22,12 +20,7 @@ from _pytest.fixtures import SubRequest
 
 from api_genius import Router
 from action_words import set_trace
-
-import pytest
-
-def is_open_port(port: int) -> bool:
-    with socket(AF_INET, SOCK_STREAM) as sock:
-        return sock.connect_ex(('localhost', port)) == 0
+from action_words import is_open_port
 
 def pytest_addoption(parser: Parser):
     parser.addoption(
@@ -163,13 +156,17 @@ def _create_tables(used_models, base_class, database_engine):
     for model in used_models:
         model.__table__.drop(database_engine)
 
+@fixture(name='DatabaseSession', scope='function')
+def _database_session(database_engine):
+    return sessionmaker(bind=database_engine)
+
 @fixture(name='server', scope='function')
-def _server(user_model: Type[Base], server_port: int, patch_breakpoint) -> None:
+def _server(user_model: Type[Base], server_port: int, patch_breakpoint, DatabaseSession) -> None:
     assert not is_open_port(server_port)
 
     application = FastAPI()
     router = Router()
-    router.add_tabulate_api(None, user_model)
+    router.add_tabulate_api(DatabaseSession, user_model)
     application.include_router(router)
 
     process = Process(target=run, args=(application,), kwargs={'port': server_port, 'log_level': 'critical'}, daemon=True)
@@ -179,5 +176,3 @@ def _server(user_model: Type[Base], server_port: int, patch_breakpoint) -> None:
         sleep(0.5)
     yield
     process.terminate()
-
-
