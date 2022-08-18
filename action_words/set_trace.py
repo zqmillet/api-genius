@@ -21,7 +21,6 @@ class ForkablePdb(Pdb):
             sys.stdin = current_stdin
 
 def set_trace(*, header=None):
-
     pdb = ForkablePdb()
     if header is not None:
         pdb.message(header)

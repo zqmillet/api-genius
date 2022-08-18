@@ -130,7 +130,7 @@ def _server(user_model: Type[Base], server_port: int, patch_breakpoint) -> None:
     router.add_tabulate_api(None, user_model)
     application.include_router(router)
 
-    process = Process(target=run, args=(application,), kwargs={'host': '0.0.0.0', 'port': server_port, 'debug': True}, daemon=True)
+    process = Process(target=run, args=(application,), kwargs={'host': '0.0.0.0', 'port': server_port, 'log_level': 'critical'}, daemon=True)
     process.start()
 
     while not is_open_port(server_port):
