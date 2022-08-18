@@ -1,3 +1,4 @@
+import builtins
 from typing import Type
 from typing import TypeVar
 from socket import socket
@@ -18,6 +19,7 @@ from _pytest.config.argparsing import Parser
 from _pytest.fixtures import SubRequest
 
 from api_genius import Router
+from action_words import set_trace
 
 def is_open_port(port: int) -> bool:
     with socket(AF_INET, SOCK_STREAM) as sock:
@@ -102,6 +104,13 @@ def _base_class() -> Type[DeclarativeMeta]:
 
 Base = TypeVar('Base')
 
+@fixture(name='patch_breakpoint', scope='session')
+def _patch_breakpoint():
+    origin_breakpoint = builtins.breakpoint
+    builtins.breakpoint = set_trace
+    yield
+    builtins.breakpoint = origin_breakpoint
+
 @fixture(name='user_model', scope='session')
 def _user_model(base_class: Type[Base]) -> Type[Base]:
     class User(base_class): # type: ignore
@@ -113,7 +122,7 @@ def _user_model(base_class: Type[Base]) -> Type[Base]:
     return User
 
 @fixture(name='server', scope='function')
-def _server(user_model: Type[Base], server_port: int) -> None:
+def _server(user_model: Type[Base], server_port: int, patch_breakpoint) -> None:
     assert not is_open_port(server_port)
 
     application = FastAPI()
