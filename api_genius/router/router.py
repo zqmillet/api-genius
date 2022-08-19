@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi import Request
+from action_words.set_trace import set_trace
 
 class Router(APIRouter):
     """
@@ -12,4 +13,5 @@ class Router(APIRouter):
         """
         @self.get('/')
         def get(request: Request) -> str:
+            set_trace()
             return 'hello world'

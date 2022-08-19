@@ -1,6 +1,4 @@
-import builtins
 from typing import Type
-from typing import TypeVar
 from urllib.parse import quote
 from multiprocessing import Process
 from time import sleep
@@ -10,26 +8,39 @@ from fastapi import FastAPI
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.decl_api import DeclarativeMeta
-from sqlalchemy import Column
-from sqlalchemy import String
-from sqlalchemy import Integer
 from sqlalchemy import create_engine
 from pytest import fixture
 from _pytest.config.argparsing import Parser
 from _pytest.fixtures import SubRequest
+from _pytest.python import Function
 
 from api_genius import Router
-from action_words import set_trace
 from action_words import is_open_port
-from action_words.models import Base
-from action_words.models import User
+
+def create_tables(database_engine, models):
+    for model in models:
+        model.__table__.create(database_engine, checkfirst=True)
+
+def drop_tables(database_engine, models):
+    for model in models:
+        model.__table__.drop(database_engine)
+
+def pytest_runtest_call(item: Function):
+    for mark in item.iter_markers():
+        if mark.name == 'create_tables':
+            create_tables(item._request.getfixturevalue('database_engine'), *mark.args, **mark.kwargs)
+
+def pytest_runtest_teardown(item: Function):
+    for mark in item.iter_markers():
+        if mark.name == 'create_tables':
+            drop_tables(item._request.getfixturevalue('database_engine'), *mark.args, **mark.kwargs)
 
 def pytest_addoption(parser: Parser):
     parser.addoption(
         '--mysql-host',
         type=str,
         action='store',
-        default='localhost',
+        default='host.docker.internal',
         help='specify the host of mysql for test'
     )
 
@@ -101,13 +112,6 @@ def _server_port(request: SubRequest) -> int:
 def _base_class() -> Type[DeclarativeMeta]:
     return declarative_base()
 
-@fixture(name='patch_breakpoint', scope='session')
-def _patch_breakpoint():
-    origin_breakpoint = builtins.breakpoint
-    builtins.breakpoint = set_trace
-    yield
-    builtins.breakpoint = origin_breakpoint
-
 @fixture(name='database_engine', scope='session')
 def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mysql_database):
     engine_url = f'mysql+pymysql://{quote(mysql_username)}:{quote(mysql_password)}@{mysql_host}:{mysql_port}'
@@ -117,28 +121,7 @@ def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mys
         yield create_engine(f'{engine_url}/{mysql_database}')
         connection.execute(f'drop database if exists {mysql_database}')
 
-@fixture(name='used_models', scope='function')
-def _used_models(request: SubRequest, base_class: Type[Base]):
-    models = []
-    for fixture_name in request.fixturenames:
-        try:
-            fixture_value = request.getfixturevalue(fixture_name)
-        except LookupError:
-            continue
-
-        if not isinstance(fixture_value, type):
-            continue
-
-        if fixture_value is base_class:
-            continue
-
-        if not issubclass(fixture_value, base_class):
-            continue
-
-        models.append(fixture_value)
-    return models
-
-@fixture(name='create_tables', scope='function', autouse=True)
+@fixture(name='create_tables', scope='function')
 def _create_tables(models, base_class, database_engine):
     for model in models:
         model.__table__.create(database_engine)
@@ -146,17 +129,16 @@ def _create_tables(models, base_class, database_engine):
     for model in models:
         model.__table__.drop(database_engine)
 
-@fixture(name='DatabaseSession', scope='function')
-def _database_session(database_engine):
+@fixture(name='database_session_class', scope='function')
+def _database_session_class(database_engine):
     return sessionmaker(bind=database_engine)
 
 @fixture(name='server', scope='function')
-def _server(server_port: int, patch_breakpoint, DatabaseSession) -> None:
+def _server(server_port: int, DatabaseSession) -> None:
     assert not is_open_port(server_port)
 
     application = FastAPI()
     router = Router()
-    router.add_tabulate_api(DatabaseSession, user_model)
     application.include_router(router)
 
     process = Process(target=run, args=(application,), kwargs={'port': server_port, 'log_level': 'critical'}, daemon=True)
