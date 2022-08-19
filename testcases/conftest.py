@@ -21,13 +21,15 @@ from _pytest.fixtures import SubRequest
 from api_genius import Router
 from action_words import set_trace
 from action_words import is_open_port
+from action_words.models import Base
+from action_words.models import User
 
 def pytest_addoption(parser: Parser):
     parser.addoption(
         '--mysql-host',
         type=str,
         action='store',
-        default='host.docker.internal',
+        default='localhost',
         help='specify the host of mysql for test'
     )
 
@@ -99,24 +101,12 @@ def _server_port(request: SubRequest) -> int:
 def _base_class() -> Type[DeclarativeMeta]:
     return declarative_base()
 
-Base = TypeVar('Base')
-
 @fixture(name='patch_breakpoint', scope='session')
 def _patch_breakpoint():
     origin_breakpoint = builtins.breakpoint
     builtins.breakpoint = set_trace
     yield
     builtins.breakpoint = origin_breakpoint
-
-@fixture(name='user_model', scope='session')
-def _user_model(base_class: Type[Base]) -> Type[Base]:
-    class User(base_class): # type: ignore
-        __tablename__ = 'users'
-
-        id = Column(String(50), primary_key=True)
-        name = Column(String(50))
-        age = Column(Integer())
-    return User
 
 @fixture(name='database_engine', scope='session')
 def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mysql_database):
@@ -148,12 +138,12 @@ def _used_models(request: SubRequest, base_class: Type[Base]):
         models.append(fixture_value)
     return models
 
-@fixture(name='create_tables', scope='function')
-def _create_tables(used_models, base_class, database_engine):
-    for model in used_models:
+@fixture(name='create_tables', scope='function', autouse=True)
+def _create_tables(models, base_class, database_engine):
+    for model in models:
         model.__table__.create(database_engine)
     yield
-    for model in used_models:
+    for model in models:
         model.__table__.drop(database_engine)
 
 @fixture(name='DatabaseSession', scope='function')
@@ -161,7 +151,7 @@ def _database_session(database_engine):
     return sessionmaker(bind=database_engine)
 
 @fixture(name='server', scope='function')
-def _server(user_model: Type[Base], server_port: int, patch_breakpoint, DatabaseSession) -> None:
+def _server(server_port: int, patch_breakpoint, DatabaseSession) -> None:
     assert not is_open_port(server_port)
 
     application = FastAPI()
