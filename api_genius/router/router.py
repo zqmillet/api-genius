@@ -11,6 +11,7 @@ class Router(APIRouter):
         """
         this method is used to generate tabulate api of a model.
         """
+        set_trace()
 
         @self.get(path)
         def get(request: Request) -> str:
