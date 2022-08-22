@@ -4,6 +4,9 @@ from pdb import Pdb
 from os import fdopen
 
 class ForkablePdb(Pdb):
+    """
+    this is pdb for forked process.
+    """
     _original_stdin_fd = sys.stdin.fileno()
     _original_stdin = None
 
@@ -21,7 +24,10 @@ class ForkablePdb(Pdb):
             sys.stdin = current_stdin
 
 def set_trace(*, header=None):
+    """
+    this is advanced pdb, which can be used in forked pdb.
+    """
     pdb = ForkablePdb()
     if header is not None:
         pdb.message(header)
-    pdb.set_trace(sys._getframe().f_back)
+    pdb.set_trace(sys._getframe().f_back) # pylint: disable = protected-access

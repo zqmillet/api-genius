@@ -11,7 +11,7 @@ from action_words import User
 def test_gen_api(server_port, database_session_class):
     application = FastAPI()
     router = Router()
-    router.add_tabulate_api(session_class=database_session_class, model=User)
+    router.add_tabulate_api(path='/', session_class=database_session_class, model=User)
     application.include_router(router)
 
     with start_server(application, server_port) as server:

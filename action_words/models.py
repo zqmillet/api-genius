@@ -6,6 +6,9 @@ from sqlalchemy import Integer
 Base = declarative_base()
 
 class User(Base): # type: ignore
+    """
+    this class is used for testing.
+    """
     __tablename__ = 'users'
 
     id = Column(String(50), primary_key=True)
