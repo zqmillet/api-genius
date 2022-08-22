@@ -8,10 +8,10 @@ from action_words import start_server
 from action_words import User
 
 @mark.create_tables(models=[User])
-def test_gen_api(server_port, database_session_class):
+def test_gen_api(server_port, session_maker):
     application = FastAPI()
     router = Router()
-    router.add_tabulate_api(path='/', session_class=database_session_class, model=User)
+    router.add_tabulate_api(path='/', session_class=session_maker, model=User)
     application.include_router(router)
 
     with start_server(application, server_port) as server:

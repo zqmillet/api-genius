@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi import Request
+from sqlalchemy.orm import sessionmaker
 from action_words.set_trace import set_trace
 
 class Router(APIRouter):
@@ -7,7 +8,7 @@ class Router(APIRouter):
     this class is a subclass of the class APIRouter of fastapi module.
     it provides additional method for auto api generation.
     """
-    def add_tabulate_api(self, path, session_class, model):
+    def add_tabulate_api(self, path: str, session_class: sessionmaker, model):
         """
         this method is used to generate tabulate api of a model.
         """

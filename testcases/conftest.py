@@ -18,12 +18,15 @@ from api_genius import Router
 from action_words import is_open_port
 
 def create_tables(database_engine, models):
+    """
+    this function is used to
+    """
     for model in models:
         model.__table__.create(database_engine, checkfirst=True)
 
 def drop_tables(database_engine, models):
     for model in models:
-        model.__table__.drop(database_engine)
+        model.__table__.drop(database_engine, checkfirst=True)
 
 def pytest_runtest_call(item: Function):
     for mark in item.iter_markers():
@@ -121,20 +124,12 @@ def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mys
         yield create_engine(f'{engine_url}/{mysql_database}')
         connection.execute(f'drop database if exists {mysql_database}')
 
-@fixture(name='create_tables', scope='function')
-def _create_tables(models, base_class, database_engine):
-    for model in models:
-        model.__table__.create(database_engine)
-    yield
-    for model in models:
-        model.__table__.drop(database_engine)
-
-@fixture(name='database_session_class', scope='function')
-def _database_session_class(database_engine):
+@fixture(name='session_maker', scope='function')
+def _session_maker(database_engine):
     return sessionmaker(bind=database_engine)
 
 @fixture(name='server', scope='function')
-def _server(server_port: int, DatabaseSession) -> None:
+def _server(server_port: int) -> None:
     assert not is_open_port(server_port)
 
     application = FastAPI()
