@@ -3,8 +3,9 @@ from urllib.parse import quote
 from multiprocessing import Process
 from time import sleep
 
-from uvicorn import run
+from subprocess import Popen
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.decl_api import DeclarativeMeta
@@ -13,9 +14,6 @@ from pytest import fixture
 from _pytest.config.argparsing import Parser
 from _pytest.fixtures import SubRequest
 from _pytest.python import Function
-
-from api_genius import Router
-from action_words import is_open_port
 
 def create_tables(database_engine, models):
     """
@@ -123,23 +121,3 @@ def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mys
         connection.execute(f'create database if not exists {mysql_database}')
         yield create_engine(f'{engine_url}/{mysql_database}')
         connection.execute(f'drop database if exists {mysql_database}')
-
-@fixture(name='session_maker', scope='function')
-def _session_maker(database_engine):
-    return sessionmaker(bind=database_engine)
-
-@fixture(name='server', scope='function')
-def _server(server_port: int) -> None:
-    assert not is_open_port(server_port)
-
-    application = FastAPI()
-    router = Router()
-    application.include_router(router)
-
-    process = Process(target=run, args=(application,), kwargs={'port': server_port, 'log_level': 'critical'}, daemon=True)
-    process.start()
-
-    while not is_open_port(server_port):
-        sleep(0.5)
-    yield
-    process.terminate()
