@@ -28,4 +28,4 @@ def test_gen_api(database_engine):
     application.add_create_api(database_engine=database_engine, path='/user/{id}')(User)
     test_client = TestClient(app=application)
 
-    print(test_client.post('/user/id1'))
+    print(test_client.post('/user/id1', json={'age': 233, 'name': 'qiqi'}).json())
