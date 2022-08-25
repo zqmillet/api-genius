@@ -100,7 +100,11 @@ def _get_default_value(column: _Column) -> Optional[Any]:
     """
     this function is used to get default value from column.
     """
-    pass
+    if column.default is None:
+        if column.nullable:
+            return None
+        return ...
+    return column.default.arg
 
 def _get_validations(column: _Column) -> Dict[str, Any]:
     validations: Dict[str, Any] = {}
@@ -125,7 +129,19 @@ def _get_body_parameters(path: str, model: Type[Base], method: str) -> Type[obje
     for name, column in model.__table__.columns.items():
         if name in placeholders:
             continue
-        body_fields[name] = (_get_python_type(column), Field(title=column.comment, example=_get_example_value(column), **_get_validations(column)))
+
+        if column.private:
+            continue
+
+        body_fields[name] = (
+            _get_python_type(column),
+            Field(
+                title=column.comment,
+                example=_get_example_value(column),
+                default=_get_default_value(column),
+                **_get_validations(column)
+            )
+        )
 
     return create_model(_get_auto_generated_class_name(model), **body_fields)
 
