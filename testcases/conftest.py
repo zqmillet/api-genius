@@ -14,6 +14,9 @@ from pytest import fixture
 from _pytest.config.argparsing import Parser
 from _pytest.fixtures import SubRequest
 from _pytest.python import Function
+from jsonref import loads
+
+from api_genius import Application
 
 def create_tables(database_engine, models):
     """
@@ -121,3 +124,16 @@ def _database_engine(mysql_host, mysql_port, mysql_username, mysql_password, mys
         connection.execute(f'create database if not exists {mysql_database}')
         yield create_engine(f'{engine_url}/{mysql_database}')
         connection.execute(f'drop database if exists {mysql_database}')
+
+@fixture(name='application', scope='function')
+def _application():
+    return Application()
+
+class Client(TestClient):
+    @property
+    def openapi(self):
+        return loads(self.get('/openapi.json').text)
+
+@fixture(name='client', scope='function')
+def _client(application):
+    return Client(app=application)
