@@ -9,6 +9,7 @@ from string import Formatter
 from uuid import uuid4
 from dataclasses import dataclass
 from numbers import Real
+from functools import lru_cache
 
 from fastapi import FastAPI
 from fastapi import Depends
@@ -145,6 +146,21 @@ def _get_body_parameters(path: str, model: Type[Base], method: str) -> Type[obje
 
     return create_model(_get_auto_generated_class_name(model), **body_fields)
 
+@lru_cache
+def _sqlalchemy_model_to_pydantic_model(model: Type[Base]):
+    fields: Dict[str, FieldInfo] = {}
+
+    for name, column in model.__table__.columns.items():
+        fields[name] = (
+            column.type.python_type,
+            Field(default=_get_default_value(column), title=column.comment)
+        )
+
+    return create_model(model_name_prefix + model.__name__, __config__=config, **fields)
+
+def _get_response_model(model):
+    pass
+
 def _get_api_path(model: Type[Base]) -> str:
     items = ['', model.__tablename__]
     for column in model.__table__.columns:
@@ -164,14 +180,32 @@ class Application(FastAPI):
         def _add_create_api(model: Type[Base]) -> Type[Base]:
             api_path = path or _get_api_path(model)
 
-            def wapper(body_parameters: BaseModel, path_parameters: DependsType = Depends()) -> None:
+            def wrapper(body_parameters: BaseModel, path_parameters: DependsType = Depends()) -> None:
                 print(path_parameters, body_parameters, database_engine)
 
-            wapper.__annotations__ = {
+            wrapper.__annotations__ = {
                 'path_parameters': _get_path_parameters(api_path, model, method),
                 'body_parameters': _get_body_parameters(api_path, model, method),
             }
 
-            self.post(api_path, summary=f'create {model.__tablename__}')(wapper)
+            self.post(api_path, summary=f'create {model.__tablename__}')(wrapper)
             return model
         return _add_create_api
+
+    def add_read_api(self, database_engine: Engine, path: Optional[str] = None, method: str = 'get'):
+        """
+        this function is used to bind api of reading a resource.
+        """
+        def _add_read_api(model: Type[Base]) -> Type[Base]:
+            api_path = path or _get_api_path(model)
+
+            def wrapper(path_parameters: DependsType = Depends()) -> None:
+                print(path_parameters, database_engine)
+
+            wrapper.__annotations__ = {
+                'path_parameters': _get_path_parameters(api_path, model, method)
+            }
+
+            self.get(api_path, summary=f'create {model.__tablename__}')(wrapper)
+            return model
+        return _add_read_api

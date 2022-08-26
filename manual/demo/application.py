@@ -1,4 +1,5 @@
 from enum import Enum as Enum
+from loguru import logger
 
 from sqlalchemy import String
 from sqlalchemy import Integer
@@ -16,6 +17,7 @@ class Role(str, Enum):
     user = 'user'
 
 @application.add_create_api(database_engine=None)
+@application.add_read_api(database_engine=None)
 class User(Base):
     __tablename__ = 'users'
 
