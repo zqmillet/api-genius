@@ -2,7 +2,6 @@ from typing import Dict
 from typing import List
 from typing import Callable
 from typing import Type
-from typing import Tuple
 from typing import Any
 from typing import Optional
 from string import Formatter
@@ -17,6 +16,7 @@ from fastapi import Path
 from fastapi.params import Path as PathType
 from fastapi.params import Depends as DependsType
 from pydantic import create_model
+from pydantic import BaseConfig
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from pydantic import BaseModel
@@ -42,28 +42,28 @@ class Base(metaclass=DeclarativeMeta):
     registry = registry()
     metadata = registry.metadata
 
-class Column(_Column):
+class Column(_Column): # pylint: disable = abstract-method, too-many-ancestors
     """
     this class is subclass of class Column from sqlachemy module.
     it provides some extension features.
     """
     def __init__(self,
-        *args,
+        *args: Any,
         example: Optional[Any] = None,
         private: bool = False,
         ge: Optional[Real] = None,
         gt: Optional[Real] = None,
         le: Optional[Real] = None,
         lt: Optional[Real] = None,
-        **kwargs
-    ):
+        **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.example = example
         self.private = private
-        self.ge = ge
-        self.le = le
-        self.gt = gt
-        self.lt = lt
+        self.ge = ge # pylint: disable = invalid-name
+        self.le = le # pylint: disable = invalid-name
+        self.gt = gt # pylint: disable = invalid-name
+        self.lt = lt # pylint: disable = invalid-name
 
 def _get_auto_generated_class_name(model: Type[Base]) -> str:
     return f'{model.__tablename__}_{str(uuid4())[:8]}'
@@ -80,7 +80,7 @@ def _get_path_parameters(path: str, model: Type[Base], method: str) -> Type[obje
         if placeholder not in model.__table__.columns:
             continue
 
-        column: Column = model.__table__.columns[placeholder]
+        column: _Column = model.__table__.columns[placeholder]
         path_fields[placeholder] = Path(..., title=column.comment, example=_get_example_value(column), **_get_validations(column))
         path_annotations[placeholder] = column.type.python_type
 
@@ -147,8 +147,8 @@ def _get_body_parameters(path: str, model: Type[Base], method: str) -> Type[obje
     return create_model(_get_auto_generated_class_name(model), **body_fields)
 
 @lru_cache
-def _sqlalchemy_model_to_pydantic_model(model: Type[Base]):
-    fields: Dict[str, FieldInfo] = {}
+def _sqlalchemy_model_to_pydantic_model(model: Type[Base], config: Type = type('Config', (BaseConfig,), {'orm_mode': True})) -> Type[BaseModel]:
+    fields: Dict[Any, Any] = {}
 
     for name, column in model.__table__.columns.items():
         fields[name] = (
@@ -156,9 +156,9 @@ def _sqlalchemy_model_to_pydantic_model(model: Type[Base]):
             Field(default=_get_default_value(column), title=column.comment)
         )
 
-    return create_model(model_name_prefix + model.__name__, __config__=config, **fields)
+    return create_model(_get_auto_generated_class_name(model), __config__=config, **fields)
 
-def _get_response_model(model):
+def _get_response_model(model: Type[Base]) -> Type[BaseModel]:
     pass
 
 def _get_api_path(model: Type[Base]) -> str:
@@ -173,7 +173,7 @@ class Application(FastAPI):
     """
     inherit the class FastAPI, and provide some methods.
     """
-    def add_create_api(self, database_engine: Engine, path: Optional[str] = None, method: str = 'post') -> Callable[[Type[Base]], None]:
+    def add_create_api(self, database_engine: Engine, path: Optional[str] = None, method: str = 'post') -> Callable[[Type[Base]], Type[Base]]:
         """
         this function is used to bind api of creating a resource.
         """
@@ -192,7 +192,7 @@ class Application(FastAPI):
             return model
         return _add_create_api
 
-    def add_read_api(self, database_engine: Engine, path: Optional[str] = None, method: str = 'get'):
+    def add_read_api(self, database_engine: Engine, path: Optional[str] = None, method: str = 'get') -> Callable[[Type[Base]], Type[Base]]:
         """
         this function is used to bind api of reading a resource.
         """
