@@ -29,6 +29,7 @@ from sqlalchemy import Enum
 from sqlalchemy import Float
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy.sql.functions import GenericFunction
 
 
 class Base(metaclass=DeclarativeMeta):
@@ -105,7 +106,11 @@ def _get_default_value(column: _Column) -> Optional[Any]:
         if column.nullable:
             return None
         return ...
-    return column.default.arg
+
+    if not isinstance(column.default.arg, GenericFunction):
+        return column.default.arg
+
+    return None
 
 def _get_validations(column: _Column) -> Dict[str, Any]:
     validations: Dict[str, Any] = {}
@@ -152,14 +157,14 @@ def _sqlalchemy_model_to_pydantic_model(model: Type[Base], config: Type = type('
 
     for name, column in model.__table__.columns.items():
         fields[name] = (
-            column.type.python_type,
+            Optional[column.type.python_type] if column.nullable else column.type.python_type,
             Field(default=_get_default_value(column), title=column.comment)
         )
 
     return create_model(_get_auto_generated_class_name(model), __config__=config, **fields)
 
-def _get_response_model(model: Type[Base]) -> Type[BaseModel]:
-    pass
+# def _get_response_model(model: Type[Base]) -> Type[BaseModel]:
+#     breakpoint()
 
 def _get_api_path(model: Type[Base]) -> str:
     items = ['', model.__tablename__]
@@ -179,8 +184,9 @@ class Application(FastAPI):
         """
         def _add_create_api(model: Type[Base]) -> Type[Base]:
             api_path = path or _get_api_path(model)
+            response_model = _sqlalchemy_model_to_pydantic_model(model)
 
-            def wrapper(body_parameters: BaseModel, path_parameters: DependsType = Depends()) -> None:
+            def wrapper(body_parameters: BaseModel, path_parameters: DependsType = Depends()) -> response_model:
                 print(path_parameters, body_parameters, database_engine)
 
             wrapper.__annotations__ = {
@@ -188,7 +194,7 @@ class Application(FastAPI):
                 'body_parameters': _get_body_parameters(api_path, model, method),
             }
 
-            self.post(api_path, summary=f'create {model.__tablename__}')(wrapper)
+            self.post(api_path, summary=f'create {model.__tablename__}', response_model=response_model)(wrapper)
             return model
         return _add_create_api
 
@@ -198,14 +204,15 @@ class Application(FastAPI):
         """
         def _add_read_api(model: Type[Base]) -> Type[Base]:
             api_path = path or _get_api_path(model)
+            response_model = _sqlalchemy_model_to_pydantic_model(model)
 
-            def wrapper(path_parameters: DependsType = Depends()) -> None:
+            def wrapper(path_parameters: DependsType = Depends()) -> response_model:
                 print(path_parameters, database_engine)
 
             wrapper.__annotations__ = {
                 'path_parameters': _get_path_parameters(api_path, model, method)
             }
 
-            self.get(api_path, summary=f'create {model.__tablename__}')(wrapper)
+            self.get(api_path, summary=f'read {model.__tablename__}', response_model=response_model)(wrapper)
             return model
         return _add_read_api
