@@ -11,3 +11,5 @@
 ## 鸣谢
 
 ## ToDo
+
+- column type: public, private, protect.
