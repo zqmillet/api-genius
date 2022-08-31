@@ -25,6 +25,12 @@ autodoc_default_options = {
 autodoc_typehints = 'both'
 autodoc_class_signature = 'separated'
 
+rst_prolog = '''
+.. role:: py(code)
+   :language: py
+   :class: highlight
+'''
+
 autodoc_pydantic_model_show_json = False
 autodoc_pydantic_settings_show_json = False
 
